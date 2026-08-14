@@ -1,0 +1,36 @@
+{
+    "perfiles": [
+        {
+            "alias": "Autónomo",
+            "apellidos": "García López",
+            "cif": "",
+            "codigoPostal": "28001",
+            "direccion": "Calle Mayor, 1",
+            "email": "ana.garcia@ejemplo.es",
+            "esAutonomo": true,
+            "localidad": "Madrid",
+            "nif": "12345678Z",
+            "nombre": "Ana",
+            "provincia": "Madrid",
+            "razonSocial": "",
+            "telefono": "600000000",
+            "titulacion": "Arquitecto Técnico"
+        },
+        {
+            "alias": "Estudio SL",
+            "apellidos": "García López",
+            "cif": "B12345678",
+            "codigoPostal": "41001",
+            "direccion": "Av. Andalucía, 5",
+            "email": "info@estudio.es",
+            "esAutonomo": false,
+            "localidad": "Sevilla",
+            "nif": "12345678Z",
+            "nombre": "Ana",
+            "provincia": "Sevilla",
+            "razonSocial": "Estudio Ejemplo S.L.",
+            "telefono": "955000000",
+            "titulacion": "Arquitecto"
+        }
+    ]
+}
