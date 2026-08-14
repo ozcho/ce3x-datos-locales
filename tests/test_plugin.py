@@ -423,6 +423,52 @@ def pruebaFormatoAntiguo(directorio):
     print("migracion formato antiguo: OK")
 
 
+def pruebaRutaEnAppData(directorio):
+    os.environ.pop("CE3X_DATOS_ADMIN", None)
+    appdata = os.path.join(directorio, "AppData", "Roaming")
+    os.environ["APPDATA"] = appdata
+
+    esperada = os.path.join(appdata, "CE3X-DatosLocales", "datosAdministrativos.json")
+    assert DatosLocales.rutaConfiguracion() == esperada, DatosLocales.rutaConfiguracion()
+
+    # guardar debe crear la carpeta, que aun no existe
+    DatosLocales.guardarPerfiles(esperada, DatosLocales.normalizarPerfiles(PERFILES))
+    assert os.path.isfile(esperada)
+    assert len(DatosLocales.cargarPerfiles(esperada)) == 2
+    print("configuracion en %APPDATA%: OK")
+
+
+def pruebaMigracionDesdeUbicacionAntigua(directorio):
+    os.environ.pop("CE3X_DATOS_ADMIN", None)
+    appdata = os.path.join(directorio, "AppData2", "Roaming")
+    os.environ["APPDATA"] = appdata
+
+    heredada = os.path.join(directorio, "Plugins", "datosAdministrativos.json")
+    os.makedirs(os.path.dirname(heredada))
+    with open(heredada, "w") as fichero:
+        json.dump(PERFILES, fichero)
+
+    original = DatosLocales._rutasHeredadas
+    DatosLocales._rutasHeredadas = lambda: [heredada]
+    try:
+        ruta = DatosLocales.rutaConfiguracion()
+    finally:
+        DatosLocales._rutasHeredadas = original
+
+    assert ruta == os.path.join(appdata, "CE3X-DatosLocales", "datosAdministrativos.json"), ruta
+    assert os.path.isfile(ruta), "debe copiarse a AppData"
+    assert len(DatosLocales.cargarPerfiles(ruta)) == 2
+    assert os.path.isfile(heredada), "el fichero antiguo no se borra"
+    print("migracion a AppData desde Plugins: OK")
+
+
+def pruebaVariableEntornoManda(directorio):
+    ruta = os.path.join(directorio, "otro", "config.json")
+    os.environ["CE3X_DATOS_ADMIN"] = ruta
+    assert DatosLocales.rutaConfiguracion() == ruta
+    print("CE3X_DATOS_ADMIN tiene prioridad: OK")
+
+
 def main():
     directorio = tempfile.mkdtemp()
     try:
@@ -436,6 +482,9 @@ def main():
         pruebaMenuSeRefresca(Ventana(), ruta)
         pruebaSinPerfiles(directorio)
         pruebaFormatoAntiguo(directorio)
+        pruebaRutaEnAppData(directorio)
+        pruebaMigracionDesdeUbicacionAntigua(directorio)
+        pruebaVariableEntornoManda(directorio)
         print("\nOK")
     finally:
         shutil.rmtree(directorio)

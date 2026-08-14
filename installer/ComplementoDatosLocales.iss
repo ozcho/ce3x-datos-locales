@@ -2,7 +2,7 @@
 ; Compilar con Inno Setup 6 (o 5.5+):  ISCC.exe installer\ComplementoDatosLocales.iss
 
 #define NombreComplemento "Complemento Datos Locales"
-#define VersionComplemento "1.0.0"
+#define VersionComplemento "1.1.0"
 #define CarpetaPlugins "Plugins"
 
 [Setup]

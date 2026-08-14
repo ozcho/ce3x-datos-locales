@@ -15,6 +15,7 @@ import io
 import json
 import logging
 import os
+import shutil
 
 import wx
 
@@ -28,9 +29,10 @@ try:
 except NameError:
     cadena = str
 
-versionComplemento = "1.0.0"
+versionComplemento = "1.1.0"
 
 NOMBRE_JSON = "datosAdministrativos.json"
+CARPETA_DATOS = "CE3X-DatosLocales"
 VAR_ENTORNO = "CE3X_DATOS_ADMIN"
 
 # campo del perfil -> etiqueta del formulario
@@ -97,17 +99,47 @@ def etiquetaPerfil(perfil, indice):
 # --------------------------------------------------------------------------
 # persistencia
 # --------------------------------------------------------------------------
+def directorioDatos():
+    """%APPDATA%\\CE3X-DatosLocales; el HOME como respaldo si no hay APPDATA."""
+    base = os.environ.get("APPDATA") or os.path.expanduser("~")
+    return os.path.join(base, CARPETA_DATOS)
+
+
+def _rutasHeredadas():
+    """Ubicaciones de versiones anteriores, hoy de solo lectura para el usuario."""
+    return [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), NOMBRE_JSON),
+        os.path.join(os.path.expanduser("~"), NOMBRE_JSON),
+    ]
+
+
+def _aseguraDirectorio(ruta):
+    carpeta = os.path.dirname(ruta)
+    if carpeta and not os.path.isdir(carpeta):
+        os.makedirs(carpeta)
+
+
 def rutaConfiguracion():
-    """Primera ruta existente entre: variable de entorno, junto al plugin, HOME."""
-    candidatas = []
+    """Ruta de lectura y escritura. Migra la config de versiones anteriores."""
     if os.environ.get(VAR_ENTORNO):
-        candidatas.append(os.environ[VAR_ENTORNO])
-    candidatas.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), NOMBRE_JSON))
-    candidatas.append(os.path.join(os.path.expanduser("~"), NOMBRE_JSON))
-    for ruta in candidatas:
-        if os.path.isfile(ruta):
-            return ruta
-    return candidatas[-2]
+        return os.environ[VAR_ENTORNO]
+
+    destino = os.path.join(directorioDatos(), NOMBRE_JSON)
+    if os.path.isfile(destino):
+        return destino
+
+    for heredada in _rutasHeredadas():
+        if not os.path.isfile(heredada):
+            continue
+        try:
+            _aseguraDirectorio(destino)
+            shutil.copyfile(heredada, destino)
+        except (IOError, OSError):
+            logging.warning("DatosLocales: no se pudo migrar %s", heredada, exc_info=True)
+            return heredada
+        logging.info("DatosLocales: configuracion migrada de %s a %s", heredada, destino)
+        break
+    return destino
 
 
 def normalizarPerfiles(datos):
@@ -144,6 +176,7 @@ def guardarPerfiles(ruta, perfiles):
     texto = json.dumps({"perfiles": perfiles}, indent=4, ensure_ascii=False, sort_keys=True)
     if isinstance(texto, bytes):
         texto = texto.decode("utf-8")
+    _aseguraDirectorio(ruta)
     with io.open(ruta, "w", encoding="utf-8") as fichero:
         fichero.write(texto)
 

@@ -39,6 +39,8 @@ plugin/datosAdministrativos.ejemplo.json
 
 Si ya tenías una versión anterior, borra también `Plugins\DatosLocales.pyc`.
 
+El fichero de ejemplo es solo una referencia del formato: tus datos reales se guardan en `%APPDATA%` (ver más abajo).
+
 ---
 
 ## Uso
@@ -61,11 +63,17 @@ El menú se regenera solo al guardar en el editor. En el camino normal no aparec
 
 ### Fichero de datos
 
-Se busca en este orden, y se usa el primero que exista:
+Los perfiles se guardan en la carpeta de datos del usuario, que no necesita permisos de administrador:
 
-1. La ruta de la variable de entorno `CE3X_DATOS_ADMIN`
-2. `datosAdministrativos.json` junto al plugin (en `Plugins\`)
-3. `datosAdministrativos.json` en la carpeta del usuario
+```
+%APPDATA%\CE3X-DatosLocales\datosAdministrativos.json
+```
+
+es decir, algo como `C:\Users\TuUsuario\AppData\Roaming\CE3X-DatosLocales\`.
+
+Puedes forzar otra ruta con la variable de entorno `CE3X_DATOS_ADMIN`, útil para compartir la configuración entre equipos o tenerla en una unidad de red.
+
+Si vienes de una versión anterior que guardaba el JSON dentro de `Plugins\` o en la carpeta del usuario, se copia automáticamente a la nueva ubicación la primera vez. El fichero antiguo se deja donde estaba.
 
 Formato (UTF-8):
 
