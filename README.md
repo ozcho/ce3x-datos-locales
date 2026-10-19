@@ -202,19 +202,21 @@ Para subir la versión, tócala en `plugin/DatosLocales.py` (`versionComplemento
 
 ### Qué hace el instalador
 
-`DefaultDirName={code:GetDirName}` con una función Pascal que busca CE3X en:
+`DefaultDirName={code:GetDirName}` con una función Pascal que busca CE3X sin depender de ningún número de versión, por este orden:
 
-1. `HKLM\...\Uninstall\{7139BD7B-FC0B-435F-8E79-63D7CCDA2BA8}_is1` → `Inno Setup: App Path`
-2. La misma clave → `InstallLocation`
-3. `C:\Program Files (x86)\CEXv2.3`
+1. La asociación de los ficheros `.cex` en `HKCR\ArchivoCEX\shell\open\command`, que apunta al CE3X activo
+2. Las claves de desinstalación de `HKLM` (vistas de 32 y 64 bits) y `HKCU`, buscando un `DisplayName` que contenga *CE3X* o *CEX*, y leyendo de ella `Inno Setup: App Path` o `InstallLocation`
+3. Un barrido de `Program Files` y `Program Files (x86)` en busca de carpetas `CE*`, quedándose con la de nombre mayor (`CEXv2.5` gana a `CEXv2.3`)
 
-Valida que la carpeta contenga `wxFrame1.pyd` y avisa si eliges otra cosa. Deja entrada de desinstalación propia.
+Cada candidata se valida comprobando que contenga `wxFrame1.pyd` o una carpeta `Plugins`. Si nada encaja, avisa y te deja elegir la carpeta a mano, con una segunda confirmación si la que indicas no parece CE3X.
+
+En las actualizaciones no se reutiliza la carpeta anterior (`UsePreviousAppDir=no`): se vuelve a detectar, para que al pasar a una versión nueva de CE3X el complemento acabe donde toca.
 
 ---
 
 ## Compatibilidad
 
-Probado con **CE3X v2.3** sobre Windows y sobre Linux con Wine. Debería valer para cualquier 2.x que mantenga `panelDatosAdministrativos`; si algún control cambia de nombre, el complemento no peta: avisa de qué campos no ha podido aplicar.
+Probado con **CE3X v2.3** sobre Windows y sobre Linux con Wine. El instalador detecta la instalación sin depender de la versión, así que debería valer también para las posteriores. Si algún control cambia de nombre, el complemento no peta: avisa de qué campos no ha podido aplicar.
 
 ---
 

@@ -2,7 +2,7 @@
 ; Compilar con Inno Setup 6 (o 5.5+):  ISCC.exe installer\ComplementoDatosLocales.iss
 
 #define NombreComplemento "Complemento Datos Locales"
-#define VersionComplemento "1.1.0"
+#define VersionComplemento "1.2.0"
 #define CarpetaPlugins "Plugins"
 
 [Setup]
@@ -12,7 +12,10 @@ AppVersion={#VersionComplemento}
 AppVerName={#NombreComplemento} {#VersionComplemento}
 VersionInfoVersion={#VersionComplemento}
 DefaultDirName={code:GetDirName}
-DefaultGroupName=CEXv2.3
+; En una actualizacion no reutilizamos la carpeta anterior: puede ser una
+; version de CE3X ya desinstalada. Siempre se vuelve a detectar.
+UsePreviousAppDir=no
+DefaultGroupName={#NombreComplemento}
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
 DirExistsWarning=no
@@ -41,39 +44,139 @@ Type: files; Name: "{app}\{#CarpetaPlugins}\DatosLocales.pyc"
 
 [Code]
 const
-  CLAVE_CE3X = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{7139BD7B-FC0B-435F-8E79-63D7CCDA2BA8}_is1';
+  CLAVE_DESINSTALAR = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall';
+  COMANDO_ABRIR_CEX = 'ArchivoCEX\shell\open\command';
 
-// wxFrame1.pyd contiene cogerPlugins(): si esta, es una instalacion de CE3X.
+var
+  CarpetaDetectada: String;
+  DeteccionHecha: Boolean;
+
+// wxFrame1.pyd implementa cogerPlugins(); Plugins es la carpeta de destino.
 function EsCarpetaCE3X(Ruta: String): Boolean;
+var
+  Base: String;
 begin
-  Result := (Ruta <> '') and FileExists(AddBackslash(Ruta) + 'wxFrame1.pyd');
+  Result := False;
+  if Ruta = '' then
+    Exit;
+  Base := AddBackslash(Ruta);
+  Result := FileExists(Base + 'wxFrame1.pyd') or DirExists(Base + 'Plugins');
+end;
+
+function NormalizaCarpeta(Ruta: String): String;
+begin
+  Result := '';
+  Ruta := RemoveQuotes(Trim(Ruta));
+  if EsCarpetaCE3X(Ruta) then
+    Result := RemoveBackslash(Ruta);
+end;
+
+// La asociacion de los .cex apunta al CE3X realmente activo, sea cual sea su version.
+function CarpetaDesdeAsociacion(): String;
+var
+  Comando: String;
+  Posicion: Integer;
+begin
+  Result := '';
+  if not RegQueryStringValue(HKCR, COMANDO_ABRIR_CEX, '', Comando) then
+    Exit;
+  Comando := Trim(Comando);
+  if Copy(Comando, 1, 1) = '"' then
+  begin
+    Delete(Comando, 1, 1);
+    Posicion := Pos('"', Comando);
+  end
+  else
+    Posicion := Pos(' ', Comando);
+  if Posicion > 0 then
+    Comando := Copy(Comando, 1, Posicion - 1);
+  Result := NormalizaCarpeta(ExtractFileDir(Comando));
+end;
+
+function CarpetaDesdeDesinstalador(Raiz: Integer): String;
+var
+  Claves: TArrayOfString;
+  Indice: Integer;
+  Clave, Nombre, Ruta: String;
+begin
+  Result := '';
+  if not RegGetSubkeyNames(Raiz, CLAVE_DESINSTALAR, Claves) then
+    Exit;
+  for Indice := 0 to GetArrayLength(Claves) - 1 do
+  begin
+    Clave := CLAVE_DESINSTALAR + '\' + Claves[Indice];
+    if not RegQueryStringValue(Raiz, Clave, 'DisplayName', Nombre) then
+      Continue;
+    if Pos('CE3X', Uppercase(Nombre)) = 0 then
+      if Pos('CEX', Uppercase(Nombre)) = 0 then
+        Continue;
+    if RegQueryStringValue(Raiz, Clave, 'Inno Setup: App Path', Ruta) then
+    begin
+      Result := NormalizaCarpeta(Ruta);
+      if Result <> '' then
+        Exit;
+    end;
+    if RegQueryStringValue(Raiz, Clave, 'InstallLocation', Ruta) then
+    begin
+      Result := NormalizaCarpeta(Ruta);
+      if Result <> '' then
+        Exit;
+    end;
+  end;
+end;
+
+// Ultimo recurso: carpetas tipo CEXv2.3, CEXv2.4... Se queda con la mayor.
+function CarpetaEnProgramFiles(Base: String): String;
+var
+  Busqueda: TFindRec;
+  Candidata, Mejor, MejorNombre: String;
+begin
+  Mejor := '';
+  MejorNombre := '';
+  if FindFirst(AddBackslash(Base) + 'CE*', Busqueda) then
+  try
+    repeat
+      if (Busqueda.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+      begin
+        Candidata := NormalizaCarpeta(AddBackslash(Base) + Busqueda.Name);
+        if (Candidata <> '') and (Uppercase(Busqueda.Name) > MejorNombre) then
+        begin
+          Mejor := Candidata;
+          MejorNombre := Uppercase(Busqueda.Name);
+        end;
+      end;
+    until not FindNext(Busqueda);
+  finally
+    FindClose(Busqueda);
+  end;
+  Result := Mejor;
 end;
 
 function BuscaCE3X(): String;
-var
-  Ruta: String;
 begin
-  Result := '';
-  if RegQueryStringValue(HKLM, CLAVE_CE3X, 'Inno Setup: App Path', Ruta) and EsCarpetaCE3X(Ruta) then
+  if not DeteccionHecha then
   begin
-    Result := RemoveBackslash(Ruta);
-    Exit;
+    DeteccionHecha := True;
+    CarpetaDetectada := CarpetaDesdeAsociacion();
+    if CarpetaDetectada = '' then
+      CarpetaDetectada := CarpetaDesdeDesinstalador(HKLM);
+    if (CarpetaDetectada = '') and IsWin64 then
+      CarpetaDetectada := CarpetaDesdeDesinstalador(HKLM64);
+    if CarpetaDetectada = '' then
+      CarpetaDetectada := CarpetaDesdeDesinstalador(HKCU);
+    if CarpetaDetectada = '' then
+      CarpetaDetectada := CarpetaEnProgramFiles(ExpandConstant('{pf32}'));
+    if CarpetaDetectada = '' then
+      CarpetaDetectada := CarpetaEnProgramFiles(ExpandConstant('{pf}'));
   end;
-  if RegQueryStringValue(HKLM, CLAVE_CE3X, 'InstallLocation', Ruta) and EsCarpetaCE3X(Ruta) then
-  begin
-    Result := RemoveBackslash(Ruta);
-    Exit;
-  end;
-  Ruta := ExpandConstant('{pf32}\CEXv2.3');
-  if EsCarpetaCE3X(Ruta) then
-    Result := Ruta;
+  Result := CarpetaDetectada;
 end;
 
 function GetDirName(Param: String): String;
 begin
   Result := BuscaCE3X();
   if Result = '' then
-    Result := ExpandConstant('{pf32}\CEXv2.3');
+    Result := ExpandConstant('{pf32}\CEX');
 end;
 
 function InitializeSetup(): Boolean;

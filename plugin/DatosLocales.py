@@ -29,7 +29,7 @@ try:
 except NameError:
     cadena = str
 
-versionComplemento = "1.1.0"
+versionComplemento = "1.2.0"
 
 NOMBRE_JSON = "datosAdministrativos.json"
 CARPETA_DATOS = "CE3X-DatosLocales"
